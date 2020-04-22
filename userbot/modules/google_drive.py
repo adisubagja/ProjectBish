@@ -185,7 +185,8 @@ async def create_app(gdrive):
             await gdrive.edit("`Refreshing credentials...`")
             """ - Refresh credentials - """
             creds.refresh(Request())
-            helper.save_credentials(str(gdrive.from_id), creds)
+            helper.save_credentials(str(
+               gdrive.from_id), base64.b64encode(pickle.dumps(creds)).decode())
         else:
             await gdrive.edit("`Credentials is empty, please generate it...`")
             return False
