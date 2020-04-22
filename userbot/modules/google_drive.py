@@ -193,6 +193,16 @@ async def create_app(gdrive):
     return service
 
 
+@register(pattern="^.gdreset(?: |$)", outgoing=True)
+async def reset_credentials(gdrive):
+    """ - Reset credentials or change account - """
+    await gdrive.edit("`Resetting information...`")
+    helper.clear_credentials(str(gdrive.from_id))
+    await gdrive.edit("`Done...`")
+    await asyncio.sleep(1)
+    return await gdrive.delete()
+
+
 async def get_raw_name(file_path):
     """ - Get file_name from file_path - """
     return file_path.split("/")[-1]
@@ -984,6 +994,8 @@ CMD_HELP.update({
     ">`.gdauth`"
     "\nUsage: generate token to enable all cmd google drive service."
     "\nThis only need to run once in life time."
+    "\n\n>`.gdreset`"
+    "\nUsage: reset your token if something bad happened or change drive acc."
     "\n\n>.`gd <path>` or >`.gd <url1> <url2>`"
     "\nUsage: Upload file from local or uri/url into google drive."
     "\n\n>.`gd <drive-link>`"
