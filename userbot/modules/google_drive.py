@@ -23,7 +23,9 @@ import asyncio
 import math
 import time
 import re
-import heroku3
+
+import userbot.modules.sql_helper.google_drive_sql as helper
+
 from os.path import isfile, isdir, join
 from mimetypes import guess_type
 
@@ -37,9 +39,7 @@ from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 
 from userbot import (
     G_DRIVE_DATA, G_DRIVE_CLIENT_ID, G_DRIVE_CLIENT_SECRET,
-    G_DRIVE_FOLDER_ID, G_DRIVE_AUTH_TOKEN_DATA,
-    HEROKU_API_KEY, HEROKU_APP_NAME, BOTLOG_CHATID,
-    TEMP_DOWNLOAD_DIRECTORY, CMD_HELP, LOGS,
+    G_DRIVE_FOLDER_ID, BOTLOG_CHATID, TEMP_DOWNLOAD_DIRECTORY, CMD_HELP, LOGS,
 )
 from userbot.events import register
 from userbot.modules.upload_download import humanbytes, time_formatter
@@ -126,17 +126,14 @@ async def progress(current, total, gdrive, start, type_of_ps, file_name=None):
 @register(pattern="^.gdauth(?: |$)", outgoing=True)
 async def generate_credentials(gdrive):
     """ - Only generate once for long run - """
-    if G_DRIVE_AUTH_TOKEN_DATA is not None:
+    LOGS.info("Getting credentials...")
+    if helper.get_credentials(str(gdrive.from_id)) is not None:
+        LOGS.info("Credentials is exists")
         await gdrive.edit("`You already authorized token...`")
         await asyncio.sleep(1.5)
         return await gdrive.delete()
-    """ - Abort if user don't have heroku credentials - """
-    if None in [HEROKU_API_KEY or HEROKU_APP_NAME]:
-        return await gdrive.edit(
-            "`Invalid heroku credentials...`\n\n"
-            "`Please set HEROKU_API_KEY and HEROKU_APP_NAME first.`"
-        )
     """ - Generate credentials - """
+    LOGS.info("Credentials empty")
     if G_DRIVE_DATA is not None:
         configs = json.loads(G_DRIVE_DATA)
     else:
@@ -170,32 +167,24 @@ async def generate_credentials(gdrive):
         creds = flow.credentials
         await asyncio.sleep(3.5)
         await gdrive.client.delete_messages(gdrive.chat_id, msg.id)
-        await gdrive.client.delete_messages(BOTLOG_CHATID, url_msg.id)
-        await gdrive.client.delete_messages(BOTLOG_CHATID, r.id)
+        await gdrive.client.delete_messages(BOTLOG_CHATID, [url_msg.id, r.id])
         """ - Unpack credential objects into strings - """
         creds = base64.b64encode(pickle.dumps(creds)).decode()
         await gdrive.edit("`Credentials created...`")
-    heroku = heroku3.from_key(HEROKU_API_KEY)
-    configvars = heroku.app(HEROKU_APP_NAME).config()
-    msg = await gdrive.respond("`Restarting in 3s to initialize token...`")
-    await asyncio.sleep(1)
-    sleep = 1
-    while (sleep <= 3):
-        await msg.edit(f"`{sleep}`")
-        await asyncio.sleep(1)
-        sleep += 1
-    await gdrive.client.delete_messages(gdrive.chat_id, msg.id)
+    helper.save_credentials(str(gdrive.from_id), creds)
     await gdrive.delete()
-    return await save_credentials(configvars, creds)
+    return
 
 
 async def create_app(gdrive):
     """ - Create google drive service app - """
-    creds = None
-    if G_DRIVE_AUTH_TOKEN_DATA is not None:
+    LOGS.info("Getting credentials...")
+    creds = helper.get_credentials(str(gdrive.from_id))
+    if creds is not None:
+        LOGS.info("Repacking credentials...")
         """ - Repack credential objects from strings - """
         creds = pickle.loads(
-              base64.b64decode(G_DRIVE_AUTH_TOKEN_DATA.encode()))
+              base64.b64decode(creds.encode()))
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             await gdrive.edit("`Refreshing credentials...`")
@@ -206,11 +195,6 @@ async def create_app(gdrive):
             return False
     service = build('drive', 'v3', credentials=creds, cache_discovery=False)
     return service
-
-
-async def save_credentials(configvars, creds):
-    """ - Save into heroku ConfigVars - """
-    configvars["G_DRIVE_AUTH_TOKEN_DATA"] = creds
 
 
 async def get_raw_name(file_path):
