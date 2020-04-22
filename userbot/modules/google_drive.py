@@ -126,14 +126,11 @@ async def progress(current, total, gdrive, start, type_of_ps, file_name=None):
 @register(pattern="^.gdauth(?: |$)", outgoing=True)
 async def generate_credentials(gdrive):
     """ - Only generate once for long run - """
-    LOGS.info("Getting credentials...")
     if helper.get_credentials(str(gdrive.from_id)) is not None:
-        LOGS.info("Credentials is exists")
         await gdrive.edit("`You already authorized token...`")
         await asyncio.sleep(1.5)
         return await gdrive.delete()
     """ - Generate credentials - """
-    LOGS.info("Credentials empty")
     if G_DRIVE_DATA is not None:
         configs = json.loads(G_DRIVE_DATA)
     else:
@@ -178,10 +175,8 @@ async def generate_credentials(gdrive):
 
 async def create_app(gdrive):
     """ - Create google drive service app - """
-    LOGS.info("Getting credentials...")
     creds = helper.get_credentials(str(gdrive.from_id))
     if creds is not None:
-        LOGS.info("Repacking credentials...")
         """ - Repack credential objects from strings - """
         creds = pickle.loads(
               base64.b64decode(creds.encode()))
